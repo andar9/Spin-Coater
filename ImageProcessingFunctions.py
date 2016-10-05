@@ -389,7 +389,7 @@ def process_frame(frame,ref,wettedArea,theta,threshold1,threshold2):
         image2 = rotate_image(image2,theta,size=image2.shape)
         
     wettedArea = wettedArea + (image1>cutoff) + (image2>cutoff)
-
+    
     # Fill holes in the wetted area
 #    wettedArea = ndimage.morphology.binary_fill_holes(wettedArea)
     
@@ -422,6 +422,14 @@ def dilate_mask(mask,size=6,iterations=2):
     return mask
     
 if __name__ == '__main__':
+#    x = np.array([1,1,1,1,1,2,3,4,4,4,4,4,3,2,1])
+#    y = np.array([1,2,3,4,5,5,5,5,4,3,2,1,1,1,1])
+#    shape = (8,8)
+#    A = np.zeros(shape)
+#    B = get_mask(x,y,shape)
+#    pp = get_perimeter(B)
+#    plt.imshow(B,interpolation='none')
+#    plt.plot(pp[:,0],pp[:,1],'r')
     pass
 #    plt.close('all')
 #    filePath = '../Data/Prewetting Study/Water_1000RPM_2000mLmin_2000FPS.avi'
