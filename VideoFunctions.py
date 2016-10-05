@@ -36,6 +36,20 @@ def get_FPS_from_file_name(fileName):
     fps = float(name[ind-4:ind])
     return fps
     
+
+
+def get_condition_from_file_name(fileName):
+    """
+    Parse the file name to get the fluid type of the experiment.
+    """
+    name = os.path.split(fileName)[1]
+    ind = name.index('_')
+    cond = str(name[0:ind])
+    return cond
+    
+
+
+    
 def get_flowRate_from_file_name(fileName):
     """
     Parse the file name to get the FPS from the experiment.
@@ -181,7 +195,7 @@ def parse_video_obj(Video):
     return Props
     
 def get_data_structure(vid,fps,RPM,flowRate,dataFile,dataList,hMatrix,maskData,
-                       intensityRegion,splashFraction):
+                       splashFraction):
     """
     Create or load the data structure for frame-by-frame analysis of spin 
     coater data.
@@ -203,7 +217,6 @@ def get_data_structure(vid,fps,RPM,flowRate,dataFile,dataList,hMatrix,maskData,
     container['flowRate'] = flowRate
     container['hMatrix'] = hMatrix
     container['maskData'] = maskData
-    container['insensityRegion'] = intensityRegion
     container['t0Frame'] = get_t0_frame(vid,hMatrix,maskData,fraction)
     container['splashRemoved'] = [False]*len(splashFraction)
     container['splashIndex'] = 0
