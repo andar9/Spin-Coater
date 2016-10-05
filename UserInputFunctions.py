@@ -207,6 +207,16 @@ def get_intensity_region(fileName,vid):
         
     return mask
     
+def ok_to_proceed():
+    """
+    Present a dialog to the user to get permission to continue script.
+    """
+    response = ctypes.windll.user32.MessageBoxA(0, 'Ready to proceed?',
+                                                'User Input Required', 4)
+    return response == 6
 
 if __name__ == '__main__':
+    print 'here'
+    ok_to_proceed()
+    print 'done'
     pass
