@@ -16,30 +16,29 @@ import ImageProcessingFunctions as IPF
 import UserInputFunctions as UIF
 
 # User parameters
-folder = '..\\Data\\New Disk\\6.5mM SDS\\'
-fileString = '**.mp4'
-suffix = '_data.pkl'
-#fileString = '*Dry*750RPM*.mp4'
-diskFraction = 0.95
-splashFraction = np.linspace(0.15,1.1,65)#[0.25,0.33,0.4,0.5,0.67,1.1]
+folder = '..\\Data\\Cole\\3.8.16\\CS\\Fixed RPM\\'
+fileString = '*.mp4'
+diskFraction = 0.90 # 0.98 if dry; 0.95 if wet
 step = 1
-threshold1_ = 3
-threshold1_0RPM_ = 4
-threshold2_ = 5
-threshold2_0RPM_ = 4
-tShift_ = 4
+threshold1_ = 32  #Change back to 12 
+threshold1_0RPM = 5
+threshold2_ = 8
+threshold2_0RPM = 5
 checkMasks = False # Check quality of predrawn masks for each video
-maskFile = 'maskData_1APR2016.pkl'
-refPointFile = 'refPoint_31OCT2015.pkl'
-homographyFile = 'offCenterTopView_1APR2016.pkl' # Use None for no transform
+maskFile = 'maskData_3OCT2016.pkl'
+refPointFile = 'refPoint_3OCT2016.pkl'
+homographyFile = 'offCenterTopView_3OCT2016.pkl' # Use None for no transform
 viewResults = True
-viewInterval = 1
 saveInterval = 600
+
 saveData = True
 continueAnalysis = True
-figNum = 123
 
-
+#############################################################################
+observedFractionStep = 0.01
+probeFraction = 0.005
+observedFraction = 0.1
+#############################################################################
    
 # Cleanup existing windows
 plt.close('all')
@@ -50,36 +49,18 @@ t1 = tic()
 # Get list of video files to process
 pathToFiles = os.path.join(folder,fileString)
 fileList = glob.glob(pathToFiles)
-dataList = glob.glob(os.path.join(folder,'*' + suffix))
+dataList = glob.glob(os.path.join(folder,'*_data1.pkl'))
 N = len(fileList)
 hMatrix = 0
 
 for i in range(0,N,1):
     # Parse the filename to get video info
     videoPath = fileList[i]
-    print os.path.split(videoPath)[1]
-    dataFile = fileList[i][:-4] + suffix
+    dataFile = fileList[i][:-4] + '_data1.pkl'
     RPM = VF.get_RPM_from_file_name(videoPath)
     fps = VF.get_FPS_from_file_name(videoPath)
     flowRate = VF.get_flowRate_from_file_name(videoPath)
-    if flowRate > 2000:
-        splashFraction = np.append(np.linspace(0.2,0.67,30),
-                                   np.linspace(0.7,1.1,10))
-        threshold1_0RPM = 7
-        threshold2_0RPM = 7
-        tShift = 1
-    else:
-        splashFraction = np.linspace(0.2,1.1,20)
-        threshold1_0RPM = threshold1_0RPM_
-        threshold2_0RPM = threshold2_0RPM_
-        tShift = tShift_
-        
-    if (flowRate >= 3000) and (RPM > 0):
-        threshold1_ = 25
-    else:
-        threshold1_ = 20
     vid = VF.get_video_object(videoPath)
-    
     # Set thresholds for image processing to find boundaries
     if RPM > 0:
         threshold1 = threshold1_
@@ -87,8 +68,8 @@ for i in range(0,N,1):
     else:
         threshold1 = threshold1_0RPM
         threshold2 = threshold2_0RPM
-#        if fps < 1000:
-#            threshold1 *= 3
+        if fps < 1000:
+            threshold1 *= 3
     
     # Ignore videos for which the reference frame has been rotated
     if '_rot' in videoPath:
@@ -112,16 +93,15 @@ for i in range(0,N,1):
     if (dataFile not in dataList) or continueAnalysis:
         container = VF.get_data_structure(vid,fps,RPM,flowRate,dataFile,
                                           dataList,hMatrix,maskData,
-                                          intensityRegion,splashFraction)
+                                          intensityRegion)
     else:
-        print 'Already analyzed: %s' %videoPath
         continue
     
     # Parse video and stored data
     nFrames = int(vid.get(7)) # number of frames in video
     t0Frame = container['t0Frame']
     data = np.array([(0,0)])
-    frameNumber = max(container['data'].keys())
+    frameNumber = max(container['data'].keys()) # Picks up at last analyzed frame
     temp = os.path.split(videoPath)[1]
     print 'picking up analysis of %s from frame # %i of %i' %(temp,frameNumber,
                                                               nFrames)
@@ -130,18 +110,12 @@ for i in range(0,N,1):
     theta = -RPM/60./fps*360*(frameNumber-t0Frame)
     check = copy.copy(maskData['mask'])
     
-    # Create splash mask
-    center = np.shape(frame)[0:2]#maskData['diskCenter']
-    center = [center[1]/2.0,center[0]/2.0]
-    R = splashFraction[container['splashIndex']]*maskData['diskRadius']
-    splashMask = IPF.create_circular_mask(frame,R,center)
-    
     # Loop through frames in the video and track wetted area
     for j in range(frameNumber,nFrames,step):
         
         # Show an update of results
-        if ((viewResults) and (not j%viewInterval)) or (not j%saveInterval):
-            plt.figure(figNum)
+        if (viewResults) or (not j%saveInterval):
+            plt.figure(66)
             plt.cla()
             if theta != 0:
                 frame = IPF.rotate_image(frame,theta,size=frame.shape)
@@ -150,7 +124,7 @@ for i in range(0,N,1):
 
             tempFrame = np.dstack((tempFrame,frame,frame))
             Fun.plt_show_image(tempFrame)
-            plt.plot(data[:,0],data[:,1],'b',center[0],center[1],'bx')
+            plt.plot(data[:,0],data[:,1],'b')
             plt.title(temp)
             plt.pause(.001)
             
@@ -159,16 +133,35 @@ for i in range(0,N,1):
         frame = VF.extract_frame(vid,j,hMatrix,maskData)
         # Get the reference frame for background subtraction
         if RPM == 0:
-            ind = max([j-tShift,t0Frame])
+            ind = j-1
         else:
-            if theta%(360) == 0:
-                print 'Exactly integer rotation from t0Frame at %i' %(j)
-                ind = t0Frame
+            ind = t0Frame
         ref = VF.extract_frame(vid,ind,hMatrix,maskData)
             
         wettedArea = IPF.process_frame(frame,ref,wettedArea,theta,
                                        threshold1,threshold2)
-#        wettedArea *= maskData['diskMask']
+        wettedArea *= maskData['diskMask']
+        
+#############################################################################
+        testMaskData = copy.copy(maskData)
+        testMaskData2 = copy.copy(testMaskData)
+        observedMaskData = IPF.reduce_mask_radius(testMaskData,observedFraction)
+        probeMaskData = IPF.reduce_mask_radius(testMaskData2,observedFraction + probeFraction)
+        while True:
+            if not np.any(wettedArea*probeMaskData['diskMask'] - wettedArea*observedMaskData['diskMask']):
+                wettedArea *= observedMaskData['diskMask']
+                break
+            else:
+                observedFraction += observedFractionStep
+                testMaskData = copy.copy(maskData)
+                testMaskData2 = copy.copy(testMaskData)
+                observedMaskData = IPF.reduce_mask_radius(testMaskData,observedFraction)
+                probeMaskData = IPF.reduce_mask_radius(testMaskData2,observedFraction + probeFraction)
+                print 'Observed fraction extended to %f.' %observedFraction
+#############################################################################                    
+
+        
+        
         if np.any(wettedArea):
             data = IPF.get_perimeter(wettedArea)
         else:
@@ -184,22 +177,6 @@ for i in range(0,N,1):
                 pkl.dump(container,f)
             print '%i of %i completed after %f s.' %(j,nFrames,tic()-t1)
             t1 = tic()
-            
-        # Check progress of wavefront
-        if len(data) > 10:
-            rData = np.sqrt((data[:,0]-center[0])**2 + (data[:,1]-center[1])**2)
-        else:
-            rData = 0
-        # Remove splash marks
-        if (np.max(rData) >= 0.99*R)\
-            and (not container['splashRemoved'][container['splashIndex']]):
-            wettedArea *= splashMask
-            container['splashRemoved'][container['splashIndex']] = True
-            container['splashIndex'] += 1
-            R = splashFraction[container['splashIndex']]*maskData['diskRadius']
-            splashMask = IPF.create_circular_mask(frame,R,center)
-            print 'Splash marks removed at frame # %i' %(j)
-            
             
         check[wettedArea] = False
 #        print 'Number of dry pixels = ', np.sum(check)
